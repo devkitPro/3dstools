@@ -1,57 +1,28 @@
 #pragma once
-#ifndef _MSC_VER
-#include <sys/param.h>
-#else
-#define BIG_ENDIAN 1
-#define LITTLE_ENDIAN 0
-#define BYTE_ORDER LITTLE_ENDIAN
-#endif
+#include <stdint.h>
 
-typedef unsigned int word_t;
-typedef unsigned short hword_t;
-typedef unsigned char byte_t;
-typedef signed int long_t;
-typedef signed short short_t;
-typedef signed char char_t;
-typedef word_t u32;
-typedef hword_t u16;
-typedef byte_t u8;
+typedef uint32_t word_t;
+typedef uint16_t hword_t;
+typedef uint8_t byte_t;
+typedef int32_t long_t;
+typedef int16_t short_t;
+typedef int8_t char_t;
+typedef uint32_t u32;
+typedef uint16_t u16;
+typedef uint8_t u8;
 
 #define BIT(n) (1U << (n))
 
-#define foreach(type,i,ctr) for(type i = (ctr).begin(); i != (ctr).end(); ++i)
-
-#ifndef BYTE_ORDER
-#error "What's the endian of the platform you're targeting?"
-#endif
-
-#define BYTE_SHR_SHL(a, b, c) ((((a) >> (b)) & 0xFF) << (c))
-
-static inline word_t eswap_word(word_t a)
-{
-	return BYTE_SHR_SHL(a, 0, 24)
-	     | BYTE_SHR_SHL(a, 8, 16)
-	     | BYTE_SHR_SHL(a, 16, 8)
-	     | BYTE_SHR_SHL(a, 24, 0);
-}
-
-static inline hword_t eswap_hword(hword_t a)
-{
-	return BYTE_SHR_SHL(a, 0, 8) | BYTE_SHR_SHL(a, 8, 0);
-}
-
-#undef BYTE_SHR_SHL
-
-#if BYTE_ORDER == LITTLE_ENDIAN
-#define be_word(a) eswap_word(a)
-#define be_hword(a) eswap_hword(a)
-#define le_word(a) (a)
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define be_word(a)  __builtin_bswap32(a)
+#define be_hword(a) __builtin_bswap16(a)
+#define le_word(a)  (a)
 #define le_hword(a) (a)
-#elif BYTE_ORDER == BIG_ENDIAN
-#define be_word(a) (a)
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#define be_word(a)  (a)
 #define be_hword(a) (a)
-#define le_word(a) eswap_word(a)
-#define le_hword(a) eswap_hword(a)
+#define le_word(a)  __builtin_bswap32(a)
+#define le_hword(a) __builtin_bswap16(a)
 #else
-#error "What's the endian of the platform you're targeting?"
+#error "What's the endianness of the platform you're targeting?"
 #endif
