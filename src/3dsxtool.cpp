@@ -214,7 +214,7 @@ int ElfConvert::ScanRelocations()
 void ElfConvert::BuildRelocs(vector<bool>& map, int pos, int posEnd, u32& count)
 {
 	size_t curs = relocData.size();
-	for (int i = pos; i < posEnd; i ++)
+	for (int i = pos; i < posEnd;)
 	{
 		RelocEntry reloc;
 		u32 rs = 0, rp = 0;
