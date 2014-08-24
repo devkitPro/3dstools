@@ -157,6 +157,14 @@ enum
 	SHT_HIUSER = 0xffffffff  // Specific indexes
 };
 
+enum
+{
+	SHF_WRITE = 1,             // Writable section
+	SHF_ALLOC = 2,             // Loadable section
+	SHF_EXECINSTR = 4,         // Executable section
+	SHF_MASKPROC = 0xf0000000, // Processor-specific
+};
+
 #define ELF32_R_SYM(i)    ((i) >> 8)
 #define ELF32_R_TYPE(i)   ((unsigned char)(i))
 #define ELF32_R_INFO(s,t) (((s) << 8) + (unsigned char)(t))

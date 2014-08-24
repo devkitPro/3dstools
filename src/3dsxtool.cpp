@@ -179,6 +179,9 @@ int ElfConvert::ScanRelocations()
 			continue;
 
 		auto targetSect = elfSects + le_word(sect->sh_info);
+		if (!(le_word(targetSect->sh_flags) & SHF_ALLOC))
+			continue; // Ignore non-loadable sections
+
 		u32 vsect = le_word(targetSect->sh_addr);
 		auto sectData = img + le_word(targetSect->sh_offset);
 
