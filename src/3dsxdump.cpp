@@ -47,10 +47,10 @@ int Dump3DSX(FILE* f, u32 baseAddr, FILE* fout)
 		return 3;
 
 	_3DSX_LoadInfo d;
-	u32 offsets[2] = { hdr.codeSegSize, hdr.codeSegSize + hdr.rodataSegSize };
 	d.segSizes[0] = (hdr.codeSegSize+0xFFF) &~ 0xFFF;
 	d.segSizes[1] = (hdr.rodataSegSize+0xFFF) &~ 0xFFF;
 	d.segSizes[2] = (hdr.dataSegSize+0xFFF) &~ 0xFFF;
+	u32 offsets[2] = { d.segSizes[0], d.segSizes[0] + d.segSizes[1] };
 	u32 dataLoadSize = (hdr.dataSegSize-hdr.bssSize+0xFFF) &~ 0xFFF;
 	u32 bssLoadSize = d.segSizes[2] - dataLoadSize;
 	u32 nRelocTables = hdr.relocHdrSize/4;
