@@ -9,3 +9,9 @@ configure
 depcomp
 install-sh
 missing
+*.o
+*.exe
+config.log
+config.status
+Makefile
+.deps/
