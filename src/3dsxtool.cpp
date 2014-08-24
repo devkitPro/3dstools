@@ -8,6 +8,9 @@
 #include "elf.h"
 #include "FileClass.h"
 
+// Currently enabled - to be disabled when the 3DSX loader is updated
+#define OLD_3DSX_LOADER_HACK
+
 using std::vector;
 using std::map;
 
@@ -73,6 +76,7 @@ class ElfConvert
 
 	u8 *codeSeg, *rodataSeg, *dataSeg;
 	u32 codeSegSize, rodataSegSize, dataSegSize, bssSize;
+	u32 codeSizeAlign, rodataSizeAlign;
 	u32 rodataStart, dataStart;
 
 	int ScanSections();
@@ -339,7 +343,7 @@ int ElfConvert::Convert()
 				die("Invalid segment!");
 		}
 
-		topAddr = s.memPos + s.memSize;
+		topAddr = s.memPos + ((s.memSize + 0xFFF) &~ 0xFFF);
 	}
 
 	if (baseAddr != 0)
@@ -348,8 +352,10 @@ int ElfConvert::Convert()
 	if (le_word(ehdr->e_entry) != baseAddr)
 		die("Entrypoint should be zero!");
 
-	rodataStart = baseAddr + codeSegSize;
-	dataStart = rodataStart + rodataSegSize;
+	codeSizeAlign = ((codeSegSize + 0xFFF) &~ 0xFFF);
+	rodataSizeAlign = ((rodataSegSize + 0xFFF) &~ 0xFFF);
+	rodataStart = baseAddr + codeSizeAlign;
+	dataStart = rodataStart + rodataSizeAlign;
 
 	// Create relocation bitmap
 	absRelocMap.assign((topAddr - baseAddr) / 4, false);
@@ -365,8 +371,13 @@ int ElfConvert::Convert()
 	fout.WriteWord(0); // Version
 	fout.WriteWord(0); // Flags
 
+#ifndef OLD_3DSX_LOADER_HACK
 	fout.WriteWord(codeSegSize);
 	fout.WriteWord(rodataSegSize);
+#else
+	fout.WriteWord(codeSizeAlign);
+	fout.WriteWord(rodataSizeAlign);
+#endif
 	fout.WriteWord(dataSegSize);
 	fout.WriteWord(bssSize);
 
@@ -375,8 +386,25 @@ int ElfConvert::Convert()
 		fout.WriteRaw(relocHdr+i, sizeof(RelocHdr));
 
 	// Write segments
+#ifndef OLD_3DSX_LOADER_HACK
 	if (codeSeg)   fout.WriteRaw(codeSeg,   codeSegSize);
 	if (rodataSeg) fout.WriteRaw(rodataSeg, rodataSegSize);
+#else
+	if (codeSeg)
+	{
+		fout.WriteRaw(codeSeg, codeSegSize);
+		u32 padding = codeSizeAlign - codeSegSize;
+		for (u32 i = 0; i < padding; i ++)
+			fout.WriteByte(0);
+	}
+	if (rodataSeg)
+	{
+		fout.WriteRaw(rodataSeg, rodataSegSize);
+		u32 padding = rodataSizeAlign - rodataSegSize;
+		for (u32 i = 0; i < padding; i ++)
+			fout.WriteByte(0);
+	}
+#endif
 	if (dataSeg)   fout.WriteRaw(dataSeg,   dataSegSize-bssSize);
 
 	// Write relocations
