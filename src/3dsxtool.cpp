@@ -9,7 +9,7 @@
 #include "FileClass.h"
 
 // Currently enabled - to be disabled when the 3DSX loader is updated
-#define OLD_3DSX_LOADER_HACK
+//#define OLD_3DSX_LOADER_HACK
 
 using std::vector;
 using std::map;
@@ -134,6 +134,7 @@ int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab,
 				if (ELF32_ST_BIND(le_word(relSym->st_info)) == STB_WEAK && relSymAddr == 0) break;
 
 				// Add relocation
+				relSrc -= baseAddr;
 				SetReloc(relSrcAddr, absRelocMap);
 				break;
 			}
@@ -160,7 +161,7 @@ int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab,
 #ifdef DEBUG
 					printf("{CrossRelReloc} srcAddr=%08X target=%08X relocOff=%d\n", relSrcAddr, relSymAddr, relocOff);
 #endif
-					relSrc = relSymAddr; // Convert to absolute address
+					relSrc = relSymAddr - baseAddr; // Convert to absolute address
 					SetReloc(relSrcAddr, relRelocMap); // Add relocation
 				}
 
@@ -204,16 +205,16 @@ int ElfConvert::ScanRelocations()
 		if (!*symName) continue;
 		if (symName[0] != '_' && symName[1] != '_') continue;
 		if (strncmp(symName+strlen(symName)-9, "_from_arm", 9) != 0) continue;
-		SetReloc(le_word(sym->st_value), absRelocMap);
+		SetReloc(le_word(sym->st_value)+8, absRelocMap);
 	}
 
 	// Build relocs
-	BuildRelocs(absRelocMap, baseAddr/4, rodataStart/4, relocHdr[0].cAbsolute);
-	BuildRelocs(relRelocMap, baseAddr/4, rodataStart/4, relocHdr[0].cRelative);
-	BuildRelocs(absRelocMap, rodataStart/4, dataStart/4, relocHdr[1].cAbsolute);
-	BuildRelocs(relRelocMap, rodataStart/4, dataStart/4, relocHdr[1].cRelative);
-	BuildRelocs(absRelocMap, dataStart/4, topAddr/4, relocHdr[2].cAbsolute);
-	BuildRelocs(relRelocMap, dataStart/4, topAddr/4, relocHdr[2].cRelative);
+	BuildRelocs(absRelocMap, baseAddr, rodataStart, relocHdr[0].cAbsolute);
+	BuildRelocs(relRelocMap, baseAddr, rodataStart, relocHdr[0].cRelative);
+	BuildRelocs(absRelocMap, rodataStart, dataStart, relocHdr[1].cAbsolute);
+	BuildRelocs(relRelocMap, rodataStart, dataStart, relocHdr[1].cRelative);
+	BuildRelocs(absRelocMap, dataStart, topAddr, relocHdr[2].cAbsolute);
+	BuildRelocs(relRelocMap, dataStart, topAddr, relocHdr[2].cRelative);
 
 	return 0;
 }
@@ -221,6 +222,8 @@ int ElfConvert::ScanRelocations()
 void ElfConvert::BuildRelocs(vector<bool>& map, int pos, int posEnd, u32& count)
 {
 	size_t curs = relocData.size();
+	pos    = (pos    - baseAddr) / 4;
+	posEnd = (posEnd - baseAddr) / 4;
 	for (int i = pos; i < posEnd;)
 	{
 		RelocEntry reloc;
@@ -346,8 +349,8 @@ int ElfConvert::Convert()
 		topAddr = s.memPos + ((s.memSize + 0xFFF) &~ 0xFFF);
 	}
 
-	if (baseAddr != 0)
-		die("Invalid executable base address!");
+	//if (baseAddr != 0)
+	//	die("Invalid executable base address!");
 
 	if (le_word(ehdr->e_entry) != baseAddr)
 		die("Entrypoint should be zero!");
