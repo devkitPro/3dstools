@@ -93,6 +93,12 @@ class ElfConvert
 		map[address] = true;
 	}
 
+	bool HasReloc(u32 address, vector<bool>& map)
+	{
+		address = (address-baseAddr)/4;
+		return map[address];
+	}
+
 public:
 	ElfConvert(const char* f, byte_t* i, int x)
 		: fout(f, "wb"), img(i), platFlags(x), elfSyms(nullptr)
@@ -143,14 +149,31 @@ int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab,
 			case R_ARM_TARGET2:
 			case R_ARM_PREL31:
 			{
-				if(relSrcAddr & 3)
+				if (relSrcAddr & 3)
 					die("Unaligned relocation!");
+
+				// For some reason this can happen, and we definitely don't
+				// want relative relocations to be processed more than once
+				// since we convert them to absolute addresses.
+				if (HasReloc(relSrcAddr, relRelocMap))
+					break;
+
+				// PREL31 relocations sign-extend to 32-bit offsets
+				if (relType == R_ARM_PREL31)
+				{
+					relSrc &= ~BIT(31);
+					if (relSrc & BIT(30))
+						relSrc |= BIT(31);
+				}
 
 				int relocOff = (int)relSrc - ((int)relSymAddr - (int)relSrcAddr);
 
 				relSymAddr += relocOff;
 				if (relSymAddr >= topAddr)
+				{
+					printf("%d relSymAddr=%08X relSrcAddr=%08X topAddr=%08X\n", relocOff, relSymAddr, relSrcAddr, topAddr);
 					die("Relocation to invalid address!");
+				}
 
 				if (
 					((relSymAddr < rodataStart) && !(relSrcAddr < rodataStart)) ||
