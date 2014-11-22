@@ -14,4 +14,7 @@ missing
 config.log
 config.status
 Makefile
+3dsxdump
+3dsxtool
+smdhtool
 .deps/
