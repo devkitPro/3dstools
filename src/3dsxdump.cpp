@@ -168,10 +168,10 @@ int main(int argc, char* argv[])
 	FixMinGWPath(argv[2]);
 #endif
 
-	auto fin = fopen(argv[1], "rb");
+	FILE* fin = fopen(argv[1], "rb");
 	if (!fin) { printf("Cannot open input file!\n"); return 1; }
 
-	auto fout = fopen(argv[2], "wb");
+	FILE* fout = fopen(argv[2], "wb");
 	if (!fout) { fclose(fin); printf("Cannot open output file!\n"); return 1; }
 
 	int rc = Dump3DSX(fin, 0x00100000, fout);

@@ -101,10 +101,10 @@ class ElfConvert
 
 public:
 	ElfConvert(const char* f, byte_t* i, int x)
-		: fout(f, "wb"), img(i), platFlags(x), elfSyms(nullptr)
+		: fout(f, "wb"), img(i), platFlags(x), elfSyms(NULL)
 		, absRelocMap(), relRelocMap()
 		, relocData()
-		, codeSeg(nullptr), rodataSeg(nullptr), dataSeg(nullptr)
+		, codeSeg(NULL), rodataSeg(NULL), dataSeg(NULL)
 		, codeSegSize(0), rodataSegSize(0), dataSegSize(0), bssSize(0)
 	{
 	}
@@ -115,14 +115,14 @@ int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab,
 {
 	for (int i = 0; i < relCount; i ++)
 	{
-		auto rel = relTab + i;
+		Elf32_Rel* rel = relTab + i;
 		u32 relInfo = le_word(rel->r_info);
 		int relType = ELF32_R_TYPE(relInfo);
-		auto relSym = symTab + ELF32_R_SYM(relInfo);
+		Elf32_Sym* relSym = symTab + ELF32_R_SYM(relInfo);
 
 		u32 relSymAddr = le_word(relSym->st_value);
 		u32 relSrcAddr = le_word(rel->r_offset);
-		auto& relSrc = *(u32*)(sectData + relSrcAddr - vsect);
+		u32& relSrc = *(u32*)(sectData + relSrcAddr - vsect);
 
 		switch (relType)
 		{
@@ -199,22 +199,22 @@ int ElfConvert::ScanRelocations()
 {
 	for (int i = 0; i < elfSectCount; i ++)
 	{
-		auto sect = elfSects + i;
-		auto sectType = le_word(sect->sh_type);
+		Elf32_Shdr* sect = elfSects + i;
+		word_t sectType = le_word(sect->sh_type);
 		if (sectType == SHT_RELA)
 			die("Unsupported relocation section");
 		else if (sectType != SHT_REL)
 			continue;
 
-		auto targetSect = elfSects + le_word(sect->sh_info);
+		Elf32_Shdr* targetSect = elfSects + le_word(sect->sh_info);
 		if (!(le_word(targetSect->sh_flags) & SHF_ALLOC))
 			continue; // Ignore non-loadable sections
 
 		u32 vsect = le_word(targetSect->sh_addr);
-		auto sectData = img + le_word(targetSect->sh_offset);
+		byte_t* sectData = img + le_word(targetSect->sh_offset);
 
-		auto symTab = (Elf32_Sym*)(img + le_word(elfSects[le_word(sect->sh_link)].sh_offset));
-		auto relTab = (Elf32_Rel*)(img + le_word(sect->sh_offset));
+		Elf32_Sym* symTab = (Elf32_Sym*)(img + le_word(elfSects[le_word(sect->sh_link)].sh_offset));
+		Elf32_Rel* relTab = (Elf32_Rel*)(img + le_word(sect->sh_offset));
 		int relCount = (int)(le_word(sect->sh_size) / le_word(sect->sh_entsize));
 
 		safe_call(ScanRelocSection(vsect, sectData, symTab, relTab, relCount));
@@ -223,8 +223,8 @@ int ElfConvert::ScanRelocations()
 	// Scan for interworking thunks that need to be relocated
 	for (int i = 0; i < elfSymCount; i ++)
 	{
-		auto sym = elfSyms + i;
-		auto symName = (const char*)(elfSymNames + le_word(sym->st_name));
+		Elf32_Sym* sym = elfSyms + i;
+		const char* symName = (const char*)(elfSymNames + le_word(sym->st_name));
 		if (!*symName) continue;
 		if (symName[0] != '_' && symName[1] != '_') continue;
 		if (strncmp(symName+strlen(symName)-9, "_from_arm", 9) != 0) continue;
@@ -284,7 +284,7 @@ int ElfConvert::ScanSections()
 {
 	for (int i = 0; i < elfSectCount; i ++)
 	{
-		auto sect = elfSects + i;
+		Elf32_Shdr* sect = elfSects + i;
 		//auto sectName = elfSectNames + le_word(sect->sh_name);
 		switch (le_word(sect->sh_type))
 		{
@@ -307,7 +307,7 @@ int ElfConvert::Convert()
 	if (fout.openerror())
 		die("Cannot open output file!");
 
-	auto ehdr = (Elf32_Ehdr*) img;
+	Elf32_Ehdr* ehdr = (Elf32_Ehdr*) img;
 	if(memcmp(ehdr->e_ident, ELF_MAGIC, 4) != 0)
 		die("Invalid ELF file!");
 	if(le_hword(ehdr->e_type) != ET_EXEC)
@@ -317,13 +317,13 @@ int ElfConvert::Convert()
 	elfSectCount = (int)le_hword(ehdr->e_shnum);
 	elfSectNames = (const char*)(img + le_word(elfSects[le_hword(ehdr->e_shstrndx)].sh_offset));
 
-	auto phdr = (Elf32_Phdr*)(img + le_word(ehdr->e_phoff));
+	Elf32_Phdr* phdr = (Elf32_Phdr*)(img + le_word(ehdr->e_phoff));
 	baseAddr = 1, topAddr = 0;
 	if (ehdr->e_phnum > 3)
 		die("Too many segments!");
 	for (int i = 0; i < ehdr->e_phnum; i ++)
 	{
-		auto cur = phdr + i;
+		Elf32_Phdr* cur = phdr + i;
 		SegConv s;
 		s.fileOff = le_word(cur->p_offset);
 		s.flags = le_word(cur->p_flags);
@@ -434,8 +434,11 @@ int ElfConvert::Convert()
 	if (dataSeg)   fout.WriteRaw(dataSeg,   dataSegSize-bssSize);
 
 	// Write relocations
-	for (auto& reloc : relocData)
-	{
+//	for (auto& reloc : relocData)
+//	{
+	for(vector<RelocEntry>::iterator it = relocData.begin(); it != relocData.end(); ++it) {
+		RelocEntry &reloc = *it;
+
 #ifdef DEBUG
 		fprintf(stderr, "RELOC {skip: %d, patch: %d}\n", (int)reloc.skip, (int)reloc.patch);
 #endif
@@ -459,14 +462,14 @@ int main(int argc, char* argv[])
 	FixMinGWPath(argv[2]);
 #endif
 
-	auto elf_file = fopen(argv[1], "rb");
+	FILE *elf_file = fopen(argv[1], "rb");
 	if (!elf_file) die("Cannot open input file!");
 
 	fseek(elf_file, 0, SEEK_END);
 	size_t elfSize = ftell(elf_file);
 	rewind(elf_file);
 
-	auto b = (byte_t*) malloc(elfSize);
+	byte_t* b = (byte_t*) malloc(elfSize);
 	if (!b) { fclose(elf_file); die("Cannot allocate memory!"); }
 
 	fread(b, 1, elfSize, elf_file);
