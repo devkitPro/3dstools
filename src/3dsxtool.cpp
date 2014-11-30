@@ -8,9 +8,6 @@
 #include "elf.h"
 #include "FileClass.h"
 
-// Currently enabled - to be disabled when the 3DSX loader is updated
-//#define OLD_3DSX_LOADER_HACK
-
 using std::vector;
 using std::map;
 
@@ -18,14 +15,17 @@ using std::map;
 #define safe_call(a) do { int rc = a; if(rc != 0) return rc; } while(0)
 
 #ifdef WIN32
-static inline void FixMinGWPath(char* buf)
+static inline char* FixMinGWPath(char* buf)
 {
 	if (*buf == '/')
 	{
 		buf[0] = buf[1];
 		buf[1] = ':';
 	}
+	return buf;
 }
+#else
+#define FixMinGWPath(_arg) (_arg)
 #endif
 
 struct RelocEntry
@@ -79,6 +79,9 @@ class ElfConvert
 	u32 codeSizeAlign, rodataSizeAlign;
 	u32 rodataStart, dataStart;
 
+	bool hasExtHeader;
+	u32 extHeaderPos;
+
 	int ScanSections();
 
 	int ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab, Elf32_Rel* relTab, int relCount);
@@ -106,9 +109,13 @@ public:
 		, relocData()
 		, codeSeg(NULL), rodataSeg(NULL), dataSeg(NULL)
 		, codeSegSize(0), rodataSegSize(0), dataSegSize(0), bssSize(0)
+		, hasExtHeader(false), extHeaderPos(0)
 	{
 	}
 	int Convert();
+
+	void EnableExtHeader() { hasExtHeader = true; }
+	int WriteExtHeader(const char* smdhFile);
 };
 
 int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab, Elf32_Rel* relTab, int relCount)
@@ -392,45 +399,28 @@ int ElfConvert::Convert()
 
 	// Write header
 	fout.WriteWord(0x58534433); // '3DSX'
-	fout.WriteHword(8*4); // Header size
+	fout.WriteHword(8*4 + (hasExtHeader ? 3*4 : 0)); // Header size
 	fout.WriteHword(sizeof(RelocHdr)); // Relocation header size
 	fout.WriteWord(0); // Version
 	fout.WriteWord(0); // Flags
 
-#ifndef OLD_3DSX_LOADER_HACK
 	fout.WriteWord(codeSegSize);
 	fout.WriteWord(rodataSegSize);
-#else
-	fout.WriteWord(codeSizeAlign);
-	fout.WriteWord(rodataSizeAlign);
-#endif
 	fout.WriteWord(dataSegSize);
 	fout.WriteWord(bssSize);
+
+	extHeaderPos = fout.Tell();
+	if (hasExtHeader)
+		for (int i = 0; i < 3; i ++)
+			fout.WriteWord(0);
 
 	// Write relocation headers
 	for (int i = 0; i < 3; i ++)
 		fout.WriteRaw(relocHdr+i, sizeof(RelocHdr));
 
 	// Write segments
-#ifndef OLD_3DSX_LOADER_HACK
 	if (codeSeg)   fout.WriteRaw(codeSeg,   codeSegSize);
 	if (rodataSeg) fout.WriteRaw(rodataSeg, rodataSegSize);
-#else
-	if (codeSeg)
-	{
-		fout.WriteRaw(codeSeg, codeSegSize);
-		u32 padding = codeSizeAlign - codeSegSize;
-		for (u32 i = 0; i < padding; i ++)
-			fout.WriteByte(0);
-	}
-	if (rodataSeg)
-	{
-		fout.WriteRaw(rodataSeg, rodataSegSize);
-		u32 padding = rodataSizeAlign - rodataSegSize;
-		for (u32 i = 0; i < padding; i ++)
-			fout.WriteByte(0);
-	}
-#endif
 	if (dataSeg)   fout.WriteRaw(dataSeg,   dataSegSize-bssSize);
 
 	// Write relocations
@@ -449,20 +439,100 @@ int ElfConvert::Convert()
 	return 0;
 }
 
-int main(int argc, char* argv[])
+int ElfConvert::WriteExtHeader(const char* smdhFile)
 {
-	if (argc != 3)
+	FILE* f = fopen(smdhFile, "rb");
+	if (!f) die("Cannot open SMDH file!");
+
+	fseek(f, 0, SEEK_END);
+	u32 smdhSize = ftell(f);
+	fseek(f, 0, SEEK_SET);
+
+	u8* buf = (u8*)malloc(smdhSize);
+	if (!buf)
 	{
-		fprintf(stderr, "Usage:\n\t%s [inputFile] [outputFile]\n", argv[0]);
-		return 1;
+		fclose(f);
+		die("Out of memory!");
 	}
 
-#ifdef WIN32
-	FixMinGWPath(argv[1]);
-	FixMinGWPath(argv[2]);
-#endif
+	int rc = fread(buf, smdhSize, 1, f);
+	fclose(f);
 
-	FILE *elf_file = fopen(argv[1], "rb");
+	if (!rc)
+	{
+		free(buf);
+		die("Cannot read SMDH data!");
+	}
+
+	u32 temp = fout.Tell();
+	fout.Seek(extHeaderPos, SEEK_SET);
+	fout.WriteWord(temp);
+	fout.WriteWord(smdhSize);
+
+	fout.Seek(temp, SEEK_SET);
+	fout.WriteRaw(buf, smdhSize);
+	free(buf);
+
+	return 0;
+}
+
+struct argInfo
+{
+	char* outFile;
+	char* elfFile;
+	char* smdhFile;
+};
+
+int usage(const char* progName)
+{
+	fprintf(stderr,
+		"Usage:\n"
+		"    %s output.3dsx input.elf [options]\n\n"
+		"Options:\n"
+		"    --smdh=input.smdh : Embeds SMDH metadata into the output file.\n"
+		, progName);
+	return 1;
+}
+
+int parseArgs(argInfo& info, int argc, char* argv[])
+{
+	memset(&info, 0, sizeof(info));
+
+	int status = 0;
+	for (int i = 1; i < argc; i ++)
+	{
+		char* arg = argv[i];
+		if (arg[0] == '-' && arg[1] == '-')
+		{
+			arg += 2;
+			char* value = strchr(arg, '=');
+			if (!value) return usage(argv[0]);
+			*value++ = 0;
+			if (!*value) return usage(argv[0]);
+
+			if (strcmp(arg, "smdh")==0)
+				info.smdhFile = FixMinGWPath(value);
+			else
+				return usage(argv[0]);
+		} else
+		{
+			switch (status++)
+			{
+				case 0: info.outFile = FixMinGWPath(arg); break;
+				case 1: info.elfFile = FixMinGWPath(arg); break;
+				default: return usage(argv[0]);
+			}
+		}
+	}
+	return status < 2 ? usage(argv[0]) : 0;
+}
+
+int main(int argc, char* argv[])
+{
+	argInfo args;
+	safe_call(parseArgs(args, argc, argv));
+
+	FILE *elf_file = fopen(args.elfFile, "rb");
 	if (!elf_file) die("Cannot open input file!");
 
 	fseek(elf_file, 0, SEEK_END);
@@ -476,14 +546,22 @@ int main(int argc, char* argv[])
 	fclose(elf_file);
 
 	int rc = 0;
-	{
-		ElfConvert cnv(argv[2], b, 0);
+	do {
+		ElfConvert cnv(args.outFile, b, 0);
+
+		if (args.smdhFile)
+			cnv.EnableExtHeader();
+
 		rc = cnv.Convert();
-	}
+		if (rc != 0) break;
+
+		if (args.smdhFile)
+			rc = cnv.WriteExtHeader(args.smdhFile);
+	} while(0);
 	free(b);
 
 	if (rc != 0)
-		remove(argv[2]);
+		remove(args.outFile);
 
 	return rc;
 }
