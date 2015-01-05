@@ -487,7 +487,7 @@ int usage(const char* progName)
 {
 	fprintf(stderr,
 		"Usage:\n"
-		"    %s output.3dsx input.elf [options]\n\n"
+		"    %s input.elf output.3dsx [options]\n\n"
 		"Options:\n"
 		"    --smdh=input.smdh : Embeds SMDH metadata into the output file.\n"
 		, progName);
@@ -518,8 +518,8 @@ int parseArgs(argInfo& info, int argc, char* argv[])
 		{
 			switch (status++)
 			{
-				case 0: info.outFile = FixMinGWPath(arg); break;
-				case 1: info.elfFile = FixMinGWPath(arg); break;
+				case 1: info.outFile = FixMinGWPath(arg); break;
+				case 0: info.elfFile = FixMinGWPath(arg); break;
 				default: return usage(argv[0]);
 			}
 		}
