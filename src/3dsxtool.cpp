@@ -168,6 +168,10 @@ int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab,
 				// PREL31 relocations sign-extend to 32-bit offsets
 				if (relType == R_ARM_PREL31)
 				{
+					// "If bit 31 is one: this is a table entry itself (ARM_EXIDX_COMPACT)"
+					if (relSrc & BIT(31))
+						break;
+
 					relSrc &= ~BIT(31);
 					if (relSrc & BIT(30))
 						relSrc |= BIT(31);
