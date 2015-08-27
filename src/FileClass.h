@@ -39,6 +39,19 @@ public:
 	FILE* get_ptr() { return f; }
 	bool openerror() { return f == NULL; }
 
+	dword_t ReadDword()
+	{
+		dword_t value;
+		_RawRead(&value, sizeof(dword_t));
+		return LittleEndian ? le_dword(value) : be_dword(value);
+	}
+
+	void WriteDword(dword_t value)
+	{
+		value = LittleEndian ? le_dword(value) : be_dword(value);
+		_RawWrite(&value, sizeof(dword_t));
+	}
+
 	word_t ReadWord()
 	{
 		word_t value;

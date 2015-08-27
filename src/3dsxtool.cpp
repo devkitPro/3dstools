@@ -3,10 +3,12 @@
 #include <string.h>
 #include <vector>
 #include <map>
+#include <list>
 #include <algorithm>
 #include "types.h"
 #include "elf.h"
 #include "FileClass.h"
+#include "romfs.h"
 
 using std::vector;
 using std::map;
@@ -115,7 +117,7 @@ public:
 	int Convert();
 
 	void EnableExtHeader() { hasExtHeader = true; }
-	int WriteExtHeader(const char* smdhFile);
+	int WriteExtHeader(const char* smdhFile, const char* romfsDir);
 };
 
 int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab, Elf32_Rel* relTab, int relCount)
@@ -443,7 +445,7 @@ int ElfConvert::Convert()
 	return 0;
 }
 
-int ElfConvert::WriteExtHeader(const char* smdhFile)
+int ElfConvert::WriteExtHeader(const char* smdhFile, const char* romfsDir)
 {
 	FILE* f = fopen(smdhFile, "rb");
 	if (!f) die("Cannot open SMDH file!");
@@ -472,10 +474,26 @@ int ElfConvert::WriteExtHeader(const char* smdhFile)
 	fout.Seek(extHeaderPos, SEEK_SET);
 	fout.WriteWord(temp);
 	fout.WriteWord(smdhSize);
+	if (romfsDir)
+	{
+		u32 romfsPos = temp + smdhSize;
+		romfsPos = (romfsPos + 3) &~ 3;
+		fout.WriteWord(romfsPos);
+	}
 
 	fout.Seek(temp, SEEK_SET);
 	fout.WriteRaw(buf, smdhSize);
 	free(buf);
+
+	while (fout.Tell() & 3)
+		fout.WriteByte(0);
+
+	if (romfsDir)
+	{
+		RomFS romfs;
+		safe_call(romfs.Build(romfsDir));
+		safe_call(romfs.WriteToFile(fout));
+	}
 
 	return 0;
 }
@@ -485,6 +503,7 @@ struct argInfo
 	char* outFile;
 	char* elfFile;
 	char* smdhFile;
+	char* romfsDir;
 };
 
 int usage(const char* progName)
@@ -494,6 +513,7 @@ int usage(const char* progName)
 		"    %s input.elf output.3dsx [options]\n\n"
 		"Options:\n"
 		"    --smdh=input.smdh : Embeds SMDH metadata into the output file.\n"
+		"    --romfs=dir       : Embeds RomFS into the output file.\n"
 		, progName);
 	return 1;
 }
@@ -516,6 +536,8 @@ int parseArgs(argInfo& info, int argc, char* argv[])
 
 			if (strcmp(arg, "smdh")==0)
 				info.smdhFile = FixMinGWPath(value);
+			else if (strcmp(arg, "romfs")==0)
+				info.romfsDir = FixMinGWPath(value);
 			else
 				return usage(argv[0]);
 		} else
@@ -553,14 +575,15 @@ int main(int argc, char* argv[])
 	do {
 		ElfConvert cnv(args.outFile, b, 0);
 
-		if (args.smdhFile)
+		bool hasExtHeader = args.smdhFile || args.romfsDir;
+		if (hasExtHeader)
 			cnv.EnableExtHeader();
 
 		rc = cnv.Convert();
 		if (rc != 0) break;
 
-		if (args.smdhFile)
-			rc = cnv.WriteExtHeader(args.smdhFile);
+		if (hasExtHeader)
+			rc = cnv.WriteExtHeader(args.smdhFile, args.romfsDir);
 	} while(0);
 	free(b);
 
