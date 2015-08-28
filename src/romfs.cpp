@@ -113,7 +113,7 @@ int RomFS::WriteToFile(FileClass& f)
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		f.WriteRaw(dir.name.data(), dir.name.size()*2);
 #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-		writeHwordArraySlow(f, dir.name.begin(), dir.name.end());
+		writeHwordArraySlow(f, dir.name.data(), dir.name.data()+dir.name.size());
 #endif
 		while (f.Tell() & 3) f.WriteByte(0);
 	}
@@ -135,7 +135,7 @@ int RomFS::WriteToFile(FileClass& f)
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		f.WriteRaw(file.name.data(), file.name.size()*2);
 #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-		writeHwordArraySlow(f, file.name.begin(), file.name.end());
+		writeHwordArraySlow(f, file.name.data(), file.name.data()+file.name.size());
 #endif
 		while (f.Tell() & 3) f.WriteByte(0);
 	}
