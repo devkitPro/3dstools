@@ -132,6 +132,7 @@ int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab,
 		u32 relSymAddr = le_word(relSym->st_value);
 		u32 relSrcAddr = le_word(rel->r_offset);
 		u32& relSrc = *(u32*)(sectData + relSrcAddr - vsect);
+		relSrc = le_word(relSrc);
 
 		switch (relType)
 		{
@@ -146,7 +147,7 @@ int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab,
 					die("Unaligned relocation!");
 
 				// Ignore unbound weak symbols (keep them 0)
-				if (ELF32_ST_BIND(le_word(relSym->st_info)) == STB_WEAK && relSymAddr == 0) break;
+				if (ELF32_ST_BIND(relSym->st_info) == STB_WEAK && relSymAddr == 0) break;
 
 				// Add relocation
 				relSrc -= baseAddr;
@@ -204,6 +205,8 @@ int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab,
 				break;
 			}
 		}
+
+		relSrc = le_word(relSrc);
 	}
 	return 0;
 }
@@ -290,7 +293,7 @@ void ElfConvert::BuildRelocs(vector<bool>& map, int pos, int posEnd, u32& count)
 			relocData.push_back(reloc);
 		}
 	}
-	count = relocData.size() - curs;
+	count = le_word(relocData.size() - curs);
 }
 
 int ElfConvert::ScanSections()
@@ -332,9 +335,9 @@ int ElfConvert::Convert()
 
 	Elf32_Phdr* phdr = (Elf32_Phdr*)(img + le_word(ehdr->e_phoff));
 	baseAddr = 1, topAddr = 0;
-	if (ehdr->e_phnum > 3)
+	if (le_hword(ehdr->e_phnum) > 3)
 		die("Too many segments!");
-	for (int i = 0; i < ehdr->e_phnum; i ++)
+	for (int i = 0; i < le_hword(ehdr->e_phnum); i ++)
 	{
 		Elf32_Phdr* cur = phdr + i;
 		SegConv s;
