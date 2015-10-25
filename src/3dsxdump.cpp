@@ -116,13 +116,31 @@ int Dump3DSX(FILE* f, u32 baseAddr, FILE* fout)
 					u32 num_patches = le_hword(relocTbl[k].patch);
 					for (m = 0; m < num_patches && pos < endPos; m ++)
 					{
-						u32 inAddr = (char*)pos-(char*)allMem;
-						u32 addr = TranslateAddr(le_word(*pos), &d, offsets);
-						//printf("Patching %08X <-- rel(%08X,%d) (%08X)\n", baseAddr+inAddr, addr, j, le_word(*pos));
+						u32 inAddr = baseAddr + ((char*)pos-(char*)allMem);
+						u32 origData = le_word(*pos);
+						u32 subType = origData >> (32-4);
+						u32 addr = TranslateAddr(origData &~ 0xF0000000, &d, offsets);
+						//printf("Patching %08X <-- rel(%08X,%d,%u) (%08X)\n", baseAddr+inAddr, addr, j, subType, le_word(*pos));
 						switch (j)
 						{
-							case 0: *pos = le_word(addr); break;
-							case 1: *pos = le_word(addr - inAddr); break;
+							case 0:
+							{
+								if (subType != 0)
+									return 7;
+								*pos = le_word(addr);
+								break;
+							}
+							case 1:
+							{
+								u32 data = addr - inAddr;
+								switch (subType)
+								{
+									case 0: *pos = le_word(data);            break; // 32-bit signed offset
+									case 1: *pos = le_word(data &~ BIT(31)); break; // 31-bit signed offset
+									default: return 8;
+								}
+								break;
+							}
 						}
 						pos++;
 					}
@@ -133,7 +151,7 @@ int Dump3DSX(FILE* f, u32 baseAddr, FILE* fout)
 
 	// Write the data
 	if (fwrite(allMem, d.segSizes[0] + d.segSizes[1] + dataLoadSize, 1, fout) != 1)
-		return 7;
+		return 9;
 	free(allMem);
 
 	printf("CODE:   %u pages\n", d.segSizes[0] / 0x1000);

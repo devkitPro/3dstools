@@ -104,6 +104,11 @@ class ElfConvert
 		return map[address];
 	}
 
+	bool HasReloc(u32 address)
+	{
+		return HasReloc(address, absRelocMap) || HasReloc(address, relRelocMap);
+	}
+
 public:
 	ElfConvert(const char* f, byte_t* i, int x)
 		: fout(f, "wb"), img(i), platFlags(x), elfSyms(NULL)
@@ -132,8 +137,15 @@ int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab,
 		u32 relSymAddr = le_word(relSym->st_value);
 		u32 relSrcAddr = le_word(rel->r_offset);
 		u32& relSrc = *(u32*)(sectData + relSrcAddr - vsect);
-		relSrc = le_word(relSrc);
 
+		if (relSrcAddr & 3)
+			die("Unaligned relocation!");
+
+		// For some reason this can happen, and we definitely don't want relocations to be processed more than once.
+		if (HasReloc(relSrcAddr))
+			continue;
+
+		relSrc = le_word(relSrc);
 		switch (relType)
 		{
 			// Notes:
@@ -143,11 +155,14 @@ int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab,
 			case R_ARM_ABS32:
 			case R_ARM_TARGET1:
 			{
-				if(relSrcAddr & 3)
-					die("Unaligned relocation!");
-
 				// Ignore unbound weak symbols (keep them 0)
 				if (ELF32_ST_BIND(relSym->st_info) == STB_WEAK && relSymAddr == 0) break;
+
+				if (relSrc < baseAddr || relSrc >= topAddr)
+				{
+					fprintf(stderr, "absolute @ relSrc=%08X\n", relSrc);
+					die("Relocation to invalid address!");
+				}
 
 				// Add relocation
 				relSrc -= baseAddr;
@@ -159,33 +174,25 @@ int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab,
 			case R_ARM_TARGET2:
 			case R_ARM_PREL31:
 			{
-				if (relSrcAddr & 3)
-					die("Unaligned relocation!");
+				int relocOff = relSrc;
 
-				// For some reason this can happen, and we definitely don't
-				// want relative relocations to be processed more than once
-				// since we convert them to absolute addresses.
-				if (HasReloc(relSrcAddr, relRelocMap))
-					break;
-
-				// PREL31 relocations sign-extend to 32-bit offsets
 				if (relType == R_ARM_PREL31)
 				{
 					// "If bit 31 is one: this is a table entry itself (ARM_EXIDX_COMPACT)"
-					if (relSrc & BIT(31))
+					if (relocOff & BIT(31))
 						break;
 
-					relSrc &= ~BIT(31);
-					if (relSrc & BIT(30))
-						relSrc |= BIT(31);
+					// Otherwise, sign extend the offset
+					if (relocOff & BIT(30))
+						relocOff |= BIT(31);
 				}
 
-				int relocOff = (int)relSrc - ((int)relSymAddr - (int)relSrcAddr);
+				relocOff -= (int)relSymAddr - (int)relSrcAddr;
 
 				relSymAddr += relocOff;
-				if (relSymAddr >= topAddr)
+				if (relSymAddr < baseAddr || relSymAddr >= topAddr)
 				{
-					printf("%d relSymAddr=%08X relSrcAddr=%08X topAddr=%08X\n", relocOff, relSymAddr, relSrcAddr, topAddr);
+					printf("relative @ relocOff=%d relSymAddr=%08X relSrcAddr=%08X topAddr=%08X\n", relocOff, relSymAddr, relSrcAddr, topAddr);
 					die("Relocation to invalid address!");
 				}
 
@@ -196,9 +203,11 @@ int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab,
 					)
 				{
 #ifdef DEBUG
-					printf("{CrossRelReloc} srcAddr=%08X target=%08X relocOff=%d\n", relSrcAddr, relSymAddr, relocOff);
+					printf("{CrossRelReloc} %c srcAddr=%08X target=%08X relocOff=%d\n", relType == R_ARM_PREL31 ? 'R' : 'N', relSrcAddr, relSymAddr, relocOff);
 #endif
 					relSrc = relSymAddr - baseAddr; // Convert to absolute address
+					if (relType == R_ARM_PREL31)
+						relSrc |= 1 << (32-4); // Indicate this is a 31-bit relative offset
 					SetReloc(relSrcAddr, relRelocMap); // Add relocation
 				}
 
@@ -390,6 +399,9 @@ int ElfConvert::Convert()
 
 	//if (baseAddr != 0)
 	//	die("Invalid executable base address!");
+
+	if ((topAddr-baseAddr) >= 0x10000000)
+		die("The executable must not be bigger than 256 MiB!");
 
 	if (le_word(ehdr->e_entry) != baseAddr)
 		die("Entrypoint should be zero!");
