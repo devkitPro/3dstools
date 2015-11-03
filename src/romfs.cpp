@@ -111,9 +111,9 @@ int RomFS::WriteToFile(FileClass& f)
 		f.WriteWord(dir.nextHash);
 		f.WriteWord(dir.name.size()*2);
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-		f.WriteRaw(dir.name.data(), dir.name.size()*2);
+		f.WriteRaw(&dir.name.front(), dir.name.size()*2);
 #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-		writeHwordArraySlow(f, dir.name.data(), dir.name.data()+dir.name.size());
+		writeHwordArraySlow(f, &dir.name.front(), &dir.name.end());
 #endif
 		while (f.Tell() & 3) f.WriteByte(0);
 	}
@@ -133,9 +133,9 @@ int RomFS::WriteToFile(FileClass& f)
 		f.WriteWord(file.nextHash);
 		f.WriteWord(file.name.size()*2);
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-		f.WriteRaw(file.name.data(), file.name.size()*2);
+		f.WriteRaw(&file.name.front(), file.name.size()*2);
 #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-		writeHwordArraySlow(f, file.name.data(), file.name.data()+file.name.size());
+		writeHwordArraySlow(f, &file.name.front(), &file.name.end());
 #endif
 		while (f.Tell() & 3) f.WriteByte(0);
 	}
@@ -267,7 +267,7 @@ int RomFS::CalcHash(void)
 	for (std::list<romfs_dir_t>::iterator it = dirs.begin(); it != dirs.end(); ++it)
 	{
 		romfs_dir_t& dir = *it;
-		u32 hash = calcHash(dir.parent->offset, dir.name.data(), dir.name.size(), dirHashCount);
+		u32 hash = calcHash(dir.parent->offset, &dir.name.front(), dir.name.size(), dirHashCount);
 		dir.nextHash = dirHashTable[hash];
 		dirHashTable[hash] = dir.offset;
 	}
@@ -275,7 +275,7 @@ int RomFS::CalcHash(void)
 	for (std::list<romfs_file_t>::iterator it = files.begin(); it != files.end(); ++it)
 	{
 		romfs_file_t& file = *it;
-		u32 hash = calcHash(file.parent->offset, file.name.data(), file.name.size(), fileHashCount);
+		u32 hash = calcHash(file.parent->offset, &file.name.front(), file.name.size(), fileHashCount);
 		file.nextHash = fileHashTable[hash];
 		fileHashTable[hash] = file.offset;
 	}
