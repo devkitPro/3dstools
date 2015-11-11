@@ -158,7 +158,7 @@ int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab,
 				// Ignore unbound weak symbols (keep them 0)
 				if (ELF32_ST_BIND(relSym->st_info) == STB_WEAK && relSymAddr == 0) break;
 
-				if (relSrc < baseAddr || relSrc >= topAddr)
+				if (relSrc < baseAddr || relSrc > topAddr)
 				{
 					fprintf(stderr, "absolute @ relSrc=%08X\n", relSrc);
 					die("Relocation to invalid address!");
@@ -190,7 +190,7 @@ int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab,
 				relocOff -= (int)relSymAddr - (int)relSrcAddr;
 
 				relSymAddr += relocOff;
-				if (relSymAddr < baseAddr || relSymAddr >= topAddr)
+				if (relSymAddr < baseAddr || relSymAddr > topAddr)
 				{
 					printf("relative @ relocOff=%d relSymAddr=%08X relSrcAddr=%08X topAddr=%08X\n", relocOff, relSymAddr, relSrcAddr, topAddr);
 					die("Relocation to invalid address!");
@@ -199,7 +199,7 @@ int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab,
 				if (
 					((relSymAddr < rodataStart) && !(relSrcAddr < rodataStart)) ||
 					((relSymAddr >= rodataStart && relSymAddr < dataStart) && !(relSrcAddr >= rodataStart && relSrcAddr < dataStart)) ||
-					((relSymAddr >= dataStart   && relSymAddr < topAddr)   && !(relSrcAddr >= dataStart   && relSrcAddr < topAddr))
+					((relSymAddr >= dataStart   && relSymAddr <= topAddr)  && !(relSrcAddr >= dataStart   && relSrcAddr <= topAddr))
 					)
 				{
 #ifdef DEBUG
