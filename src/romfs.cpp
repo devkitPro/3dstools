@@ -24,13 +24,13 @@ static u32 calcHashTableLen(u32 entryCount)
 #undef D
 }
 
-static u32 calcHash(u32 parent, u16* name, u32 namelen, u32 total)
+static u32 calcHash(u32 parent, const romfs_str& str, u32 total)
 {
 	u32 hash = parent ^ 123456789;
-	for (u32 i = 0; i < namelen; i ++)
+	for (u32 i = 0; i < str.size(); i ++)
 	{
 		hash = (hash >> 5) | (hash << 27);
-		hash ^= name[i];
+		hash ^= str[i];
 	}
 	return hash % total;
 }
@@ -61,6 +61,7 @@ int RomFS::Build(const char* path)
 	safe_call(ScanDir(Root(), buf));
 #endif
 	safe_call(CalcHash());
+	return 0;
 }
 
 static inline u32 offset(romfs_meta_t* m)
@@ -110,6 +111,7 @@ int RomFS::WriteToFile(FileClass& f)
 		f.WriteWord(offset(dir.firstFile));
 		f.WriteWord(dir.nextHash);
 		f.WriteWord(dir.name.size()*2);
+		if (dir.name.size()==0) continue;
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		f.WriteRaw(&dir.name.front(), dir.name.size()*2);
 #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
@@ -132,6 +134,7 @@ int RomFS::WriteToFile(FileClass& f)
 		f.WriteDword(file.dataSize);
 		f.WriteWord(file.nextHash);
 		f.WriteWord(file.name.size()*2);
+		if (file.name.size()==0) continue;
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		f.WriteRaw(&file.name.front(), file.name.size()*2);
 #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
@@ -267,7 +270,7 @@ int RomFS::CalcHash(void)
 	for (std::list<romfs_dir_t>::iterator it = dirs.begin(); it != dirs.end(); ++it)
 	{
 		romfs_dir_t& dir = *it;
-		u32 hash = calcHash(dir.parent->offset, &dir.name.front(), dir.name.size(), dirHashCount);
+		u32 hash = calcHash(dir.parent->offset, dir.name, dirHashCount);
 		dir.nextHash = dirHashTable[hash];
 		dirHashTable[hash] = dir.offset;
 	}
@@ -275,7 +278,7 @@ int RomFS::CalcHash(void)
 	for (std::list<romfs_file_t>::iterator it = files.begin(); it != files.end(); ++it)
 	{
 		romfs_file_t& file = *it;
-		u32 hash = calcHash(file.parent->offset, &file.name.front(), file.name.size(), fileHashCount);
+		u32 hash = calcHash(file.parent->offset, file.name, fileHashCount);
 		file.nextHash = fileHashTable[hash];
 		fileHashTable[hash] = file.offset;
 	}
