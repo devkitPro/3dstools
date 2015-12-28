@@ -5,7 +5,7 @@ AC_PREREQ(2.61)
 AC_INIT([3dstools],[1.1.2],[https://github.com/devkitPro/3dstools/issues])
 AC_CONFIG_SRCDIR([src/3dsxtool.cpp])
 
-AM_INIT_AUTOMAKE([1.10])
+AM_INIT_AUTOMAKE([subdir-objects])
 
 AC_CANONICAL_BUILD
 AC_CANONICAL_HOST
