@@ -233,7 +233,8 @@ int RomFS::ScanDir(romfs_dir_t& dir, const oschar_t* path)
 			HANDLE hFile = CreateFileW(buf, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 			if (hFile == INVALID_HANDLE_VALUE) die("Could not open file");
 
-			BOOL rc = ReadFile(hFile, child.data, child.dataSize, NULL, NULL);
+			DWORD bytesRead = 0;
+			BOOL rc = ReadFile(hFile, child.data, child.dataSize, &bytesRead, NULL);
 			CloseHandle(hFile);
 #else
 			int fd = open(buf, O_RDONLY);
