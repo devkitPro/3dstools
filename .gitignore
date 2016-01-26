@@ -3,6 +3,7 @@ INSTALL
 Makefile.in
 aclocal.m4
 autom4te.cache
+compile
 config.guess
 config.sub
 configure
