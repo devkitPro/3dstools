@@ -60,7 +60,7 @@ void usage(char* argv[])
 {
 	fprintf(stderr,
 		"USAGE:\n"
-		"%s --create <name> <long description> <author> <icon.png> <outfile>\n"
+		"%s --create <name> <long description> <author> <large-icon.png> <small-icon.png> <outfile>\n"
 		"\n"
 		"FLAGS:\n"
 		"    --create : Create SMDH for use with the 3DS Homebrew Channel.\n",
@@ -96,6 +96,7 @@ u16 conv_argb_to_rgb565(u8 a, u8 r, u8 g, u8 b)
 	return (r << 11) | (g << 5) | b;
 }
 
+template <int size>
 int convert_png_to_icon(FILE* fd, const char* icon)
 {
 	unsigned char* img;
@@ -108,42 +109,35 @@ int convert_png_to_icon(FILE* fd, const char* icon)
 		return rc;
 	}
 
-	if(width != 48 && height != 48) {
-		printf("Expected png dimensions 48x48 pixels.\n");
+	if(width != size && height != size) {
+		printf("Expected png dimensions %dx%d pixels.\n", size, size);
 		free(img);
 		return 1;
 	}
 
-	u16 large_icon[48*48];
+	u16 icon_data[size * size];
 	u16 small_icon[24*24];
 	unsigned int x, y, xx, yy, k;
 	unsigned int n = 0;
 
-	for(y=0; y<48; y+=8) {
-		for(x=0; x<48; x+=8) {
+	for(y=0; y<size; y+=8) {
+		for(x=0; x<size; x+=8) {
 			for(k=0; k<8*8; k++) {
 				xx = (tile_order[k] & 0x7);
 				yy = (tile_order[k] >> 3);
 
-				u8* rgba = &img[4*(48*(y+yy) + (x+xx))];
+				u8* rgba = &img[4*(size*(y+yy) + (x+xx))];
 				u8 r = rgba[0];
 				u8 g = rgba[1];
 				u8 b = rgba[2];
 				u8 a = rgba[3];
 
-				large_icon[n++] = conv_argb_to_rgb565(a, r, g, b);
+				icon_data[n++] = conv_argb_to_rgb565(a, r, g, b);
 			}
 		}
 	}
 
-	for(y=0; y<24; y++) {
-		for(x=0; x<24; x++) {
-			small_icon[y*24 + x] = large_icon[y*48 + x];
-		}
-	}
-
-	fwrite(small_icon, sizeof(small_icon), 1, fd);
-	fwrite(large_icon, sizeof(large_icon), 1, fd);
+	fwrite(icon_data, sizeof(icon_data), 1, fd);
 
 	free(img);
 	return 0;
@@ -165,14 +159,18 @@ int create_hb_banner(char* argv[])
 	}
 
 
-	FILE* fd = fopen(argv[6], "wb");
+	FILE* fd = fopen(argv[7], "wb");
 	if(fd == NULL) {
 		perror("fopen");
 		return 1;
 	}
 
 	fwrite(&hdr, sizeof(hdr), 1, fd);
-	if(convert_png_to_icon(fd, argv[5]) != 0) {
+	if(convert_png_to_icon<24>(fd, argv[6]) != 0) {
+		fclose(fd);
+		return 1;
+	}
+	if(convert_png_to_icon<48>(fd, argv[5]) != 0) {
 		fclose(fd);
 		return 1;
 	}
@@ -187,13 +185,14 @@ int main(int argc, char* argv[])
 		usage(argv);
 
 	if(strcmp(argv[1], "--create") == 0) {
-		if(argc != 7) {
-			fprintf(stderr, "Expected 6 args.\n");
+		if(argc != 8) {
+			fprintf(stderr, "Expected 7 args.\n");
 			return 1;
 		}
 
 #ifdef WIN32
 		fix_mingw_path(argv[5]);
+		fix_mingw_path(argv[6]);
 #endif
 
 		return create_hb_banner(argv);
