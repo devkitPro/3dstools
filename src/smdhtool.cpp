@@ -313,7 +313,7 @@ static unsigned char* load_png(const oschar* icon, int side)
 	void* mem = malloc(size);
 	if (!mem) {
 		fclose(f);
-		printf("Mem alloc error.\n");
+		osfprintf(stderr, "Mem alloc error.\n");
 		return NULL;
 	}
 
@@ -328,8 +328,9 @@ static unsigned char* load_png(const oschar* icon, int side)
 	}
 
 	if(width != side || height != side) {
-		printf("Icon size is incorrect (expected %d×%d pixels, got "
-		       "%d×%d instead).\n", side, side, width, height);
+		osfprintf(stderr, "Icon size is incorrect (expected %d×%d "
+		                  "pixels, got %d×%d instead).\n",
+		          side, side, width, height);
 		free(img);
 		return NULL;
 	}
