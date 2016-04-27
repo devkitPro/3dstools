@@ -294,7 +294,7 @@ u8 blend_color(u8 a, u8 b, u8 c, u8 d)
 	return x/4;
 }
 
-int convert_png_to_icon(FILE* fd, const oschar* icon, const oschar* icon2)
+static unsigned char* load_png(const oschar* icon, int side)
 {
 	unsigned char* img;
 	unsigned int width, height;
@@ -303,7 +303,7 @@ int convert_png_to_icon(FILE* fd, const oschar* icon, const oschar* icon2)
 	FILE* f = osfopen(icon, osstr("rb"));
 	if (!f) {
 		osfprintf(stderr, osstr("Could not load PNG: %s\n"), icon);
-		return 1;
+		return NULL;
 	}
 
 	fseek(f, 0, SEEK_END);
@@ -314,7 +314,7 @@ int convert_png_to_icon(FILE* fd, const oschar* icon, const oschar* icon2)
 	if (!mem) {
 		fclose(f);
 		printf("Mem alloc error.\n");
-		return 1;
+		return NULL;
 	}
 
 	fread(mem, 1, size, f);
@@ -324,14 +324,26 @@ int convert_png_to_icon(FILE* fd, const oschar* icon, const oschar* icon2)
 	free(mem);
 	if(rc) {
 		osfprintf(stderr, osstr("Could not decode PNG: %s\n"), icon);
-		return 1;
+		return NULL;
 	}
 
-	if(width != 48 || height != 48) {
-		printf("Icon size is incorrect (expected 48x48 pixels, got %dx%d instead).\n", width, height);
+	if(width != side || height != side) {
+		printf("Icon size is incorrect (expected %d×%d pixels, got "
+		       "%d×%d instead).\n", side, side, width, height);
 		free(img);
-		return 1;
+		return NULL;
 	}
+
+	return img;
+}
+
+int convert_png_to_icon(FILE* fd, const oschar* icon, const oschar* icon2)
+{
+	unsigned char* img;
+
+	img = load_png(icon, 48);
+	if (!img)
+		return 1;
 
 	u16 large_icon[48*48];
 	u16 small_icon[24*24];
@@ -357,38 +369,10 @@ int convert_png_to_icon(FILE* fd, const oschar* icon, const oschar* icon2)
 
 	if (icon2)
 	{
-		f = osfopen(icon2, osstr("rb"));
-		if (!f) {
-			osfprintf(stderr, osstr("Could not load PNG: %s\n"), icon2);
-			return 1;
-		}
-
-		fseek(f, 0, SEEK_END);
-		u32 size = ftell(f);
-		rewind(f);
-
-		mem = malloc(size);
-		if (!mem) {
-			fclose(f);
-			printf("Mem alloc error.\n");
-		}
-
-		fread(mem, 1, size, f);
-		fclose(f);
-
 		free(img);
-		rc = lodepng_decode32(&img, &width, &height, (const unsigned char*)mem, size);
-		free(mem);
-		if(rc) {
-			osfprintf(stderr, osstr("Could not decode PNG: %s\n"), icon2);
-			return rc;
-		}
-
-		if(width != 24 || height != 24) {
-			printf("Icon size is incorrect (expected 48x48 pixels, got %dx%d instead).\n", width, height);
-			free(img);
+		img = load_png(icon2, 24);
+		if (!img)
 			return 1;
-		}
 	}
 
 	n = 0;
