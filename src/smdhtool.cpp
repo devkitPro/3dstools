@@ -291,7 +291,7 @@ u8 blend_color(u8 a, u8 b, u8 c, u8 d)
 	x += b;
 	x += c;
 	x += d;
-	return x/4;
+	return (x+2)/4;
 }
 
 static unsigned char* load_png(const oschar* icon, int side)
@@ -313,7 +313,7 @@ static unsigned char* load_png(const oschar* icon, int side)
 	void* mem = malloc(size);
 	if (!mem) {
 		fclose(f);
-		osfprintf(stderr, "Mem alloc error.\n");
+		osfprintf(stderr, osstr("Mem alloc error.\n"));
 		return NULL;
 	}
 
@@ -328,8 +328,8 @@ static unsigned char* load_png(const oschar* icon, int side)
 	}
 
 	if(width != side || height != side) {
-		osfprintf(stderr, "Icon size is incorrect (expected %d×%d "
-		                  "pixels, got %d×%d instead).\n",
+		osfprintf(stderr, osstr("Icon size is incorrect (expected %dx%d "
+		                  "pixels, got %dx%d instead).\n"),
 		          side, side, width, height);
 		free(img);
 		return NULL;
