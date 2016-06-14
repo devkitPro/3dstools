@@ -3,161 +3,24 @@
 #include <string.h>
 #include "types.h"
 #include "FileClass.h"
-#include "3dsx.h"
-
-typedef struct
-{
-	void* segPtrs[3]; // code, rodata & data
-	u32 segAddrs[3];
-	u32 segSizes[3];
-} _3DSX_LoadInfo;
-
-static inline u32 TranslateAddr(u32 addr, _3DSX_LoadInfo* d, u32* offsets)
-{
-	if (addr < offsets[0])
-		return d->segAddrs[0] + addr;
-	if (addr < offsets[1])
-		return d->segAddrs[1] + addr - offsets[0];
-	return d->segAddrs[2] + addr - offsets[1];
-}
+#include "3dsx_loader.h"
 
 int Dump3DSX(FILE* f, u32 baseAddr, FILE* fout)
 {
-	u32 i, j, k, m;
-
-	_3DSX_Header hdr;
-	if (fread(&hdr, sizeof(hdr), 1, f) != 1)
-		return 2;
-
-	// Endian swap!
-#define ESWAP(_field, _type) \
-	hdr._field = le_##_type(hdr._field)
-	ESWAP(magic, word);
-	ESWAP(headerSize, hword);
-	ESWAP(relocHdrSize, hword);
-	ESWAP(formatVer, word);
-	ESWAP(flags, word);
-	ESWAP(codeSegSize, word);
-	ESWAP(rodataSegSize, word);
-	ESWAP(dataSegSize, word);
-	ESWAP(bssSize, word);
-#undef ESWAP
-
-	if (hdr.magic != _3DSX_MAGIC)
-		return 3;
-
-	_3DSX_LoadInfo d;
-	d.segSizes[0] = (hdr.codeSegSize+0xFFF) &~ 0xFFF;
-	d.segSizes[1] = (hdr.rodataSegSize+0xFFF) &~ 0xFFF;
-	d.segSizes[2] = (hdr.dataSegSize+0xFFF) &~ 0xFFF;
-	u32 offsets[2] = { d.segSizes[0], d.segSizes[0] + d.segSizes[1] };
-	u32 dataLoadSize = (hdr.dataSegSize-hdr.bssSize+0xFFF) &~ 0xFFF;
-	u32 bssLoadSize = d.segSizes[2] - dataLoadSize;
-	u32 nRelocTables = hdr.relocHdrSize/4;
-	void* allMem = malloc(d.segSizes[0]+d.segSizes[1]+d.segSizes[2]+4*3*nRelocTables);
-	if (!allMem)
-		return 3;
-	d.segAddrs[0] = baseAddr;
-	d.segAddrs[1] = d.segAddrs[0] + d.segSizes[0];
-	d.segAddrs[2] = d.segAddrs[1] + d.segSizes[1];
-	d.segPtrs[0] = (char*)allMem;
-	d.segPtrs[1] = (char*)d.segPtrs[0] + d.segSizes[0];
-	d.segPtrs[2] = (char*)d.segPtrs[1] + d.segSizes[1];
-	
-	// Skip header for future compatibility.
-	fseek(f, hdr.headerSize, SEEK_SET);
-	
-	// Read the relocation headers
-	u32* relocs = (u32*)((char*)d.segPtrs[2] + hdr.dataSegSize);
-
-	for (i = 0; i < 3; i ++)
-		if (fread(&relocs[i*nRelocTables], nRelocTables*4, 1, f) != 1)
-			return 4;
-
-	// Read the segments
-	if (fread(d.segPtrs[0], hdr.codeSegSize, 1, f) != 1) return 5;
-	if (fread(d.segPtrs[1], hdr.rodataSegSize, 1, f) != 1) return 5;
-	if (fread(d.segPtrs[2], hdr.dataSegSize - hdr.bssSize, 1, f) != 1) return 5;
-
-	// BSS clear
-	memset((char*)d.segPtrs[2] + hdr.dataSegSize - hdr.bssSize, 0, hdr.bssSize);
-
-	// Relocate the segments
-	for (i = 0; i < 3; i ++)
-	{
-		for (j = 0; j < nRelocTables; j ++)
-		{
-			u32 nRelocs = le_word(relocs[i*nRelocTables+j]);
-			if (j >= 2)
-			{
-				// We are not using this table - ignore it
-				fseek(f, nRelocs*sizeof(_3DSX_Reloc), SEEK_CUR);
-				continue;
-			}
-
-#define RELOCBUFSIZE 512
-			static _3DSX_Reloc relocTbl[RELOCBUFSIZE];
-
-			u32* pos = (u32*)d.segPtrs[i];
-			u32* endPos = pos + (d.segSizes[i]/4);
-
-			while (nRelocs)
-			{
-				u32 toDo = nRelocs > RELOCBUFSIZE ? RELOCBUFSIZE : nRelocs;
-				nRelocs -= toDo;
-
-				if (fread(relocTbl, toDo*sizeof(_3DSX_Reloc), 1, f) != 1)
-					return 6;
-
-				for (k = 0; k < toDo && pos < endPos; k ++)
-				{
-					//printf("(t=%d,skip=%u,patch=%u)\n", j, (u32)relocTbl[k].skip, (u32)relocTbl[k].patch);
-					pos += le_hword(relocTbl[k].skip);
-					u32 num_patches = le_hword(relocTbl[k].patch);
-					for (m = 0; m < num_patches && pos < endPos; m ++)
-					{
-						u32 inAddr = baseAddr + ((char*)pos-(char*)allMem);
-						u32 origData = le_word(*pos);
-						u32 subType = origData >> (32-4);
-						u32 addr = TranslateAddr(origData &~ 0xF0000000, &d, offsets);
-						//printf("Patching %08X <-- rel(%08X,%d,%u) (%08X)\n", baseAddr+inAddr, addr, j, subType, le_word(*pos));
-						switch (j)
-						{
-							case 0:
-							{
-								if (subType != 0)
-									return 7;
-								*pos = le_word(addr);
-								break;
-							}
-							case 1:
-							{
-								u32 data = addr - inAddr;
-								switch (subType)
-								{
-									case 0: *pos = le_word(data);            break; // 32-bit signed offset
-									case 1: *pos = le_word(data &~ BIT(31)); break; // 31-bit signed offset
-									default: return 8;
-								}
-								break;
-							}
-						}
-						pos++;
-					}
-				}
-			}
-		}
-	}
+	Loaded3DSX ldr;
+	ldr.smdh = NULL;
+	int rc = Load3DSX(ldr, f, baseAddr);
+	if (rc != 0) return rc;
 
 	// Write the data
-	if (fwrite(allMem, d.segSizes[0] + d.segSizes[1] + dataLoadSize, 1, fout) != 1)
+	if (fwrite(ldr.code, 0x1000*(ldr.codePages+ldr.rodataPages+ldr.dataPages), 1, fout) != 1)
 		return 9;
-	free(allMem);
+	free(ldr.code);
 
-	printf("CODE:   %u pages\n", d.segSizes[0] / 0x1000);
-	printf("RODATA: %u pages\n", d.segSizes[1] / 0x1000);
-	printf("DATA:   %u pages\n", dataLoadSize / 0x1000);
-	printf("BSS:    %u pages\n", bssLoadSize / 0x1000);
+	printf("CODE:   %u pages\n", ldr.codePages);
+	printf("RODATA: %u pages\n", ldr.rodataPages);
+	printf("DATA:   %u pages\n", ldr.dataPages);
+	printf("BSS:    %u pages\n", ((ldr.dataSize+ldr.bssSize+0xFFF)>>12)-ldr.dataPages);
 
 	return 0; // Success.
 }
