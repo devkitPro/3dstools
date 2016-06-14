@@ -94,6 +94,7 @@ public:
 	bool WriteRaw(const void* buffer, size_t size) { return _RawWrite(buffer, size) == size; }
 
 	void Seek(int pos, int mode) { fseek(f, pos, mode); }
-	int Tell() { return filePos /*ftell(f)*/; }
+	int Tell() { return ftell(f); }
 	void Flush() { fflush(f); }
+	FILE* Detach() { FILE* p = f; f = NULL; return p; }
 };
