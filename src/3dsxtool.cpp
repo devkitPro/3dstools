@@ -86,7 +86,7 @@ class ElfConvert
 
 	int ScanSections();
 
-	int ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab, Elf32_Rel* relTab, int relCount);
+	int ScanRelocSection(u32 vsect, u32 vsectend, byte_t* sectData, Elf32_Sym* symTab, Elf32_Rel* relTab, int relCount);
 	int ScanRelocations();
 
 	void BuildRelocs(vector<bool>& map, int pos, int posEnd, u32& count);
@@ -125,7 +125,7 @@ public:
 	int WriteExtHeader(const char* smdhFile, const char* romfsDir);
 };
 
-int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab, Elf32_Rel* relTab, int relCount)
+int ElfConvert::ScanRelocSection(u32 vsect, u32 vsectend, byte_t* sectData, Elf32_Sym* symTab, Elf32_Rel* relTab, int relCount)
 {
 	for (int i = 0; i < relCount; i ++)
 	{
@@ -140,6 +140,10 @@ int ElfConvert::ScanRelocSection(u32 vsect, byte_t* sectData, Elf32_Sym* symTab,
 
 		if (relSrcAddr & 3)
 			die("Unaligned relocation!");
+
+		// For some reason this has been observed to happen sometimes in .relARM.exidx
+		if (relSrcAddr < vsect || relSrcAddr >= vsectend)
+			continue;
 
 		// For some reason this can happen, and we definitely don't want relocations to be processed more than once.
 		if (HasReloc(relSrcAddr))
@@ -236,13 +240,14 @@ int ElfConvert::ScanRelocations()
 			continue; // Ignore non-loadable sections
 
 		u32 vsect = le_word(targetSect->sh_addr);
+		u32 vsectend = vsect + le_word(targetSect->sh_size);
 		byte_t* sectData = img + le_word(targetSect->sh_offset);
 
 		Elf32_Sym* symTab = (Elf32_Sym*)(img + le_word(elfSects[le_word(sect->sh_link)].sh_offset));
 		Elf32_Rel* relTab = (Elf32_Rel*)(img + le_word(sect->sh_offset));
 		int relCount = (int)(le_word(sect->sh_size) / le_word(sect->sh_entsize));
 
-		safe_call(ScanRelocSection(vsect, sectData, symTab, relTab, relCount));
+		safe_call(ScanRelocSection(vsect, vsectend, sectData, symTab, relTab, relCount));
 	}
 
 	// Scan for interworking thunks that need to be relocated
