@@ -162,7 +162,7 @@ int ElfConvert::ScanRelocSection(u32 vsect, u32 vsectend, byte_t* sectData, Elf3
 				// Ignore unbound weak symbols (keep them 0)
 				if (ELF32_ST_BIND(relSym->st_info) == STB_WEAK && relSymAddr == 0) break;
 
-				if (relSrc < baseAddr || relSrc > topAddr)
+				if (relSrc < baseAddr)
 				{
 					fprintf(stderr, "absolute @ relSrc=%08X\n", relSrc);
 					die("Relocation to invalid address!");
