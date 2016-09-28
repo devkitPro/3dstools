@@ -166,7 +166,7 @@ int utf8_to_utf16(u16 *out, const char *in, u32 len)
 
 			if(out != NULL)
 			{
-				if(rc + units <= len)
+				if((u32)(rc + units) <= len)
 				{
 					*out++ = encoded[0];
 					if(units > 1)
@@ -204,7 +204,7 @@ u8 blend_color(u8 a, u8 b, u8 c, u8 d)
 	return (x+2)/4;
 }
 
-static unsigned char* load_png(const oschar* icon, int side)
+static unsigned char* load_png(const oschar* icon, unsigned int side)
 {
 	unsigned char* img;
 	unsigned int width, height;
@@ -238,8 +238,8 @@ static unsigned char* load_png(const oschar* icon, int side)
 	}
 
 	if(width != side || height != side) {
-		osfprintf(stderr, osstr("Icon size is incorrect (expected %dx%d "
-		                  "pixels, got %dx%d instead).\n"),
+		osfprintf(stderr, osstr("Icon size is incorrect (expected %ux%u "
+		                  "pixels, got %ux%u instead).\n"),
 		          side, side, width, height);
 		free(img);
 		return NULL;

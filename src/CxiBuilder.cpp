@@ -197,7 +197,7 @@ int CxiBuilder::FinishConfig(void)
 	// Write dependencies
 	if (deps.size() > 48)
 	{
-		fprintf(stderr, "Too many dependencies: %u\n", deps.size());
+		fprintf(stderr, "Too many dependencies: %zu\n", deps.size());
 		return 1;
 	}
 	cur = 0;
@@ -207,7 +207,7 @@ int CxiBuilder::FinishConfig(void)
 	// Write services
 	if (services.size() > 34)
 	{
-		fprintf(stderr, "Too many services: %u\n", services.size());
+		fprintf(stderr, "Too many services: %zu\n", services.size());
 		return 1;
 	}
 	cur = 0;
@@ -229,7 +229,7 @@ int CxiBuilder::FinishConfig(void)
 	// Write system saves
 	if (sysSaves.size() > 2)
 	{
-		fprintf(stderr, "Too many system saves: %u\n", sysSaves.size());
+		fprintf(stderr, "Too many system saves: %zu\n", sysSaves.size());
 		return 1;
 	}
 	cur = 0;
@@ -239,7 +239,7 @@ int CxiBuilder::FinishConfig(void)
 	// Write other saves
 	if (otherSaves.size() > 6 || (exh.accessCtrlInfo.localCaps11.storageInfo.extdataId && otherSaves.size() > 3))
 	{
-		fprintf(stderr, "Too many other saves: %u\n", otherSaves.size());
+		fprintf(stderr, "Too many other saves: %zu\n", otherSaves.size());
 		return 1;
 	}
 	cur = 0;

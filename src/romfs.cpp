@@ -240,7 +240,7 @@ int RomFS::ScanDir(romfs_dir_t& dir, const oschar_t* path)
 			int fd = open(buf, O_RDONLY);
 			if (fd < 0) die("Could not open file");
 
-			bool rc = read(fd, child.data, child.dataSize) == child.dataSize;
+			bool rc = read(fd, child.data, child.dataSize) == (ssize_t)child.dataSize;
 			close(fd);
 #endif
 
