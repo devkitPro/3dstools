@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include <vector>
 #include <map>
 #include <list>
@@ -120,7 +119,7 @@ public:
 		, hasExtHeader(false), extHeaderPos(0)
 	{
 	}
-	int Convert(u32 appID);
+	int Convert();
 
 	void EnableExtHeader() { hasExtHeader = true; }
 	int WriteExtHeader(const char* smdhFile, const char* romfsDir);
@@ -333,7 +332,7 @@ int ElfConvert::ScanSections()
 	return 0;
 }
 
-int ElfConvert::Convert(u32 appID)
+int ElfConvert::Convert()
 {
 	if (fout.openerror())
 		die("Cannot open output file!");
@@ -445,14 +444,6 @@ int ElfConvert::Convert(u32 appID)
 	for (int i = 0; i < 3; i ++)
 		fout.WriteRaw(relocHdr+i, sizeof(RelocHdr));
 
-	// Adjust Application ID
-	u8* appid = &codeSeg[12];
-	appid[0] = appID & 0xff;
-	appid[1] = (appID >>  8) & 0xff;
-	appid[2] = (appID >> 16) & 0xff;
-	appid[3] = (appID >> 24) & 0xff;
-
-
 	// Write segments
 	if (codeSeg)   fout.WriteRaw(codeSeg,   codeSegSize);
 	if (rodataSeg) fout.WriteRaw(rodataSeg, rodataSegSize);
@@ -533,7 +524,6 @@ struct argInfo
 	char* elfFile;
 	char* smdhFile;
 	char* romfsDir;
-	u32   appID;
 };
 
 int usage(const char* progName)
@@ -544,31 +534,13 @@ int usage(const char* progName)
 		"Options:\n"
 		"    --smdh=input.smdh : Embeds SMDH metadata into the output file.\n"
 		"    --romfs=dir       : Embeds RomFS into the output file.\n"
-		"    --appid=value     : Set 3dsx Application ID.\n"
 		, progName);
 	return 1;
-}
-
-int getAppID(const char *buf)
-{
-
-	errno = 0;
-
-	int appID = strtoul(buf,0,0);
-
-	if (errno)
-	{
-		appID = 0x300;
-		perror("--appid");
-	}
-	return appID;
 }
 
 int parseArgs(argInfo& info, int argc, char* argv[])
 {
 	memset(&info, 0, sizeof(info));
-
-	info.appID = 0x300;
 
 	int status = 0;
 	for (int i = 1; i < argc; i ++)
@@ -586,8 +558,6 @@ int parseArgs(argInfo& info, int argc, char* argv[])
 				info.smdhFile = FixMinGWPath(value);
 			else if (strcmp(arg, "romfs")==0)
 				info.romfsDir = FixMinGWPath(value);
-			else if (strcmp(arg, "appid")==0)
-				info.appID = getAppID(value);
 			else
 				return usage(argv[0]);
 		} else
@@ -629,7 +599,7 @@ int main(int argc, char* argv[])
 		if (hasExtHeader)
 			cnv.EnableExtHeader();
 
-		rc = cnv.Convert(args.appID);
+		rc = cnv.Convert();
 		if (rc != 0) break;
 
 		if (hasExtHeader)
