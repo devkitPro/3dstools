@@ -202,7 +202,7 @@ int Load3DSX(Loaded3DSX& out, FILE* f, u32 baseAddr, bool pagePad)
 		{
 			out.romfsLevel3Offset = exhdr.fsOffset;
 			fseek(f, 0, SEEK_END);
-			out.romfsLevel3Size = ftello64(f) - exhdr.fsOffset;
+			out.romfsLevel3Size = ftello(f) - exhdr.fsOffset;
 		}
 	} else
 		out.smdh = NULL;

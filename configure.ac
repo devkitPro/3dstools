@@ -13,5 +13,14 @@ AC_CANONICAL_HOST
 AC_PROG_CC
 AC_PROG_CXX
 
+AC_SYS_LARGEFILE
+AC_FUNC_FSEEKO
+
+AS_CASE([$host_os],
+ [mingw32*],
+  [AC_DEFINE([__USE_MINGW_ANSI_STDIO], [1], [Set to 1 to use C99 printf/snprintf in MinGW.])
+ ],
+ [])
+
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
