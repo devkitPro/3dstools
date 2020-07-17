@@ -177,6 +177,7 @@ int ElfConvert::ScanRelocSection(u32 vsect, u32 vsectend, byte_t* sectData, Elf3
 			case R_ARM_REL32:
 			case R_ARM_TARGET2:
 			case R_ARM_PREL31:
+			case R_ARM_TLS_IE32:
 			{
 				int relocOff = relSrc;
 

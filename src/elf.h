@@ -183,7 +183,8 @@ enum
 	R_ARM_TARGET2 = 41,
 	R_ARM_PREL31 = 42,
 	R_ARM_THM_JUMP11 = 102,
-	R_ARM_THM_JUMP8 = 103
+	R_ARM_THM_JUMP8 = 103,
+	R_ARM_TLS_IE32 = 107,
 };
 
 // Symbol scope
