@@ -16,20 +16,6 @@ using std::map;
 #define die(msg) do { fputs(msg "\n\n", stderr); return 1; } while(0)
 #define safe_call(a) do { int rc = a; if(rc != 0) return rc; } while(0)
 
-#ifdef WIN32
-static inline char* FixMinGWPath(char* buf)
-{
-	if (*buf == '/')
-	{
-		buf[0] = buf[1];
-		buf[1] = ':';
-	}
-	return buf;
-}
-#else
-#define FixMinGWPath(_arg) (_arg)
-#endif
-
 struct argInfo
 {
 	char* outFile;
@@ -55,8 +41,8 @@ int parseArgs(argInfo& info, int argc, char* argv[])
 		char* arg = argv[i];
 		switch (status++)
 		{
-			case 1: info.outFile = FixMinGWPath(arg); break;
-			case 0: info.romfsDir = FixMinGWPath(arg); break;
+			case 1: info.outFile = arg; break;
+			case 0: info.romfsDir = arg; break;
 			default: return usage(argv[0]);
 		}
 	}
