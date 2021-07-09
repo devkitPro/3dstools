@@ -18,6 +18,7 @@ Makefile
 3dsxdump
 3dsxtool
 smdhtool
+mkromfs3ds
 .deps/
 *.bz2
 .dirstamp
