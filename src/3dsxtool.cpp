@@ -514,7 +514,7 @@ int ElfConvert::WriteExtHeader(const char* smdhFile, const char* romfsDir)
 		struct stat romfsStat;
 		stat(romfsDir, &romfsStat);
 
-		if (!S_ISDIR(romfsStat.st_mode))
+		if (S_ISREG(romfsStat.st_mode))
 		{
 			/* try opening a romfs file */
 			FileClass romfsFile(romfsDir, "rb");
