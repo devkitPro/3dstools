@@ -509,11 +509,10 @@ int ElfConvert::WriteExtHeader(const char* smdhFile, const char* romfsDir)
 	while (fout.Tell() & 3)
 		fout.WriteByte(0);
 
-	bool exists = true;
-    struct stat romfsStat;
 
     if (romfsDir)
 	{	
+    	struct stat romfsStat;
 		stat(romfsDir, &romfsStat);
 		
 		if (S_ISREG(romfsStat.st_mode))
