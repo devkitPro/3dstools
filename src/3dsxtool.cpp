@@ -509,11 +509,12 @@ int ElfConvert::WriteExtHeader(const char* smdhFile, const char* romfsDir)
 	while (fout.Tell() & 3)
 		fout.WriteByte(0);
 
-	if (romfsDir)
-	{
-		struct stat romfsStat;
-		stat(romfsDir, &romfsStat);
 
+    if (romfsDir)
+	{	
+    	struct stat romfsStat;
+		stat(romfsDir, &romfsStat);
+		
 		if (S_ISREG(romfsStat.st_mode))
 		{
 			/* try opening a romfs file */
@@ -536,9 +537,14 @@ int ElfConvert::WriteExtHeader(const char* smdhFile, const char* romfsDir)
 
 				return 0;
 			}
-		}
+			else
+			{
+                fprintf(stderr, "Failed to open RomFS image %s!\n", romfsDir);
+				return 1;
+            }
+        }
 
-		RomFS romfs;
+        RomFS romfs;
 		safe_call(romfs.Build(romfsDir));
 		safe_call(romfs.WriteToFile(fout));
 	}
