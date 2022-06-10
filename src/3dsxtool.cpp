@@ -511,6 +511,33 @@ int ElfConvert::WriteExtHeader(const char* smdhFile, const char* romfsDir)
 
 	if (romfsDir)
 	{
+		struct stat romfsStat;
+		stat(romfsDir, &romfsStat);
+
+		if (S_ISREG(romfsStat.st_mode))
+		{
+			/* try opening a romfs file */
+			FileClass romfsFile(romfsDir, "rb");
+
+			if (!romfsFile.openerror())
+			{
+				/* get the file size */
+				romfsFile.Seek(0, SEEK_END);
+				int size = ftell(romfsFile.get_ptr());
+				romfsFile.Seek(0, SEEK_SET);
+
+				/* create the buffer */
+				uint8_t* file_data = (uint8_t*)malloc(size);
+
+				romfsFile.ReadRaw(file_data, size);
+				fout.WriteRaw(file_data, size);
+
+				free(file_data);
+
+				return 0;
+			}
+		}
+
 		RomFS romfs;
 		safe_call(romfs.Build(romfsDir));
 		safe_call(romfs.WriteToFile(fout));
@@ -534,7 +561,7 @@ int usage(const char* progName)
 		"    %s input.elf output.3dsx [options]\n\n"
 		"Options:\n"
 		"    --smdh=input.smdh : Embeds SMDH metadata into the output file.\n"
-		"    --romfs=dir       : Embeds RomFS into the output file.\n"
+		"    --romfs=input     : Embeds RomFS from a directory or raw RomFS archive into the output file.\n"
 		, progName);
 	return 1;
 }
