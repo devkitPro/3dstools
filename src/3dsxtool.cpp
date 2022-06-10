@@ -536,6 +536,11 @@ int ElfConvert::WriteExtHeader(const char* smdhFile, const char* romfsDir)
 
 				return 0;
 			}
+			else
+			{
+				fprintf(stderr, "Failed to open RomFS image %s!\n", romfsDir);
+				return 1;
+			}
 		}
 
 		RomFS romfs;
