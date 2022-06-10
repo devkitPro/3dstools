@@ -561,7 +561,7 @@ int usage(const char* progName)
 		"    %s input.elf output.3dsx [options]\n\n"
 		"Options:\n"
 		"    --smdh=input.smdh : Embeds SMDH metadata into the output file.\n"
-		"    --romfs=dir       : Embeds RomFS into the output file.\n"
+		"    --romfs=dir/file  : Embeds RomFS into the output file.\n"
 		, progName);
 	return 1;
 }

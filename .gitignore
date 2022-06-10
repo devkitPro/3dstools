@@ -22,3 +22,4 @@ mkromfs3ds
 .deps/
 *.bz2
 .dirstamp
+.vscode
