@@ -193,7 +193,11 @@ int RomFS::ScanDir(romfs_dir_t& dir, const oschar_t* path)
 #define _FILEISHID (pent->d_name[0] == '.')
 #define _FILEISDIR S_ISDIR(statbuf.st_mode)
 	DIR* _dir = opendir(path);
-	if (!_dir) die("Cannot open dir");
+	if (!_dir)
+	{
+		fprintf(stderr, "Failed to open directory %s!\n", path);
+		return 1;
+	}
 	struct dirent* pent;
 	while ((pent = readdir(_dir)) != NULL)
 #endif
