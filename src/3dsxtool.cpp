@@ -339,9 +339,9 @@ int ElfConvert::Convert()
 	elfSectNames = (const char*)(img + le_word(elfSects[le_hword(ehdr->e_shstrndx)].sh_offset));
 
 	Elf32_Phdr* phdr = (Elf32_Phdr*)(img + le_word(ehdr->e_phoff));
+	bool hasBaseAddr = false;
 	baseAddr = 1, topAddr = 0;
-	if (le_hword(ehdr->e_phnum) > 3)
-		die("Too many segments!");
+
 	for (int i = 0; i < le_hword(ehdr->e_phnum); i ++)
 	{
 		Elf32_Phdr* cur = phdr + i;
@@ -352,6 +352,7 @@ int ElfConvert::Convert()
 		s.fileSize = le_word(cur->p_filesz);
 		s.memPos = le_word(cur->p_vaddr);
 
+		if (le_word(cur->p_type) != PT_LOAD) continue;
 		if (!s.memSize) continue;
 
 #ifdef DEBUG
@@ -359,7 +360,7 @@ int ElfConvert::Convert()
 			i, s.fileOff, s.memPos, s.memSize, s.fileSize, s.flags);
 #endif
 
-		if (i == 0) baseAddr = s.memPos;
+		if (!hasBaseAddr) { hasBaseAddr = true; baseAddr = s.memPos; }
 		else if (s.memPos != topAddr) die("Non-contiguous segments!");
 
 		if (s.memSize & 3) die("The segments is not word-aligned!");
