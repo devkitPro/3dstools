@@ -63,10 +63,10 @@ int Dump3DSX(FILE* f, u32 baseAddr, FILE* fout)
 	d.segPtrs[0] = (char*)allMem;
 	d.segPtrs[1] = (char*)d.segPtrs[0] + d.segSizes[0];
 	d.segPtrs[2] = (char*)d.segPtrs[1] + d.segSizes[1];
-	
+
 	// Skip header for future compatibility.
 	fseek(f, hdr.headerSize, SEEK_SET);
-	
+
 	// Read the relocation headers
 	u32* relocs = (u32*)((char*)d.segPtrs[2] + hdr.dataSegSize);
 
@@ -162,17 +162,6 @@ int Dump3DSX(FILE* f, u32 baseAddr, FILE* fout)
 	return 0; // Success.
 }
 
-#ifdef WIN32
-static inline void FixMinGWPath(char* buf)
-{
-	if (*buf == '/')
-	{
-		buf[0] = buf[1];
-		buf[1] = ':';
-	}
-}
-#endif
-
 int main(int argc, char* argv[])
 {
 	if (argc != 3)
@@ -180,11 +169,6 @@ int main(int argc, char* argv[])
 		fprintf(stderr, "Usage:\n\t%s [inputFile] [outputFile]\n", argv[0]);
 		return 1;
 	}
-
-#ifdef WIN32
-	FixMinGWPath(argv[1]);
-	FixMinGWPath(argv[2]);
-#endif
 
 	FILE* fin = fopen(argv[1], "rb");
 	if (!fin) { printf("Cannot open input file!\n"); return 1; }

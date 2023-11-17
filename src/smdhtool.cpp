@@ -16,7 +16,6 @@
 #define osfprintf fwprintf
 #define osstrcmp wcscmp
 #define osstr(_n) L##_n
-static char** utf8_argv;
 #else
 #define osmain main
 #define oschar char
@@ -125,16 +124,6 @@ static const u8 tile_order[] =
 	36, 37, 44, 45, 38, 39, 46, 47, 52, 53, 60, 61, 54, 55, 62, 63
 };
 
-
-#ifdef WIN32
-static inline void fix_mingw_path(oschar* buf) {
-	if (*buf == '/') {
-		buf[0] = buf[1];
-		buf[1] = ':';
-	}
-}
-#endif
-
 void usage(oschar* argv[])
 {
 	osfprintf(stderr,
@@ -146,6 +135,8 @@ void usage(oschar* argv[])
 		argv[0]);
 	exit(1);
 }
+
+#ifndef WIN32
 
 static int decode_utf8(u32 *out, const char *in)
 {
@@ -270,6 +261,8 @@ int utf8_to_utf16(u16 *out, const char *in, u32 len)
 
 	return rc;
 }
+
+#endif
 
 u16 conv_argb_to_rgb565(u8 a, u8 r, u8 g, u8 b)
 {
@@ -431,15 +424,9 @@ int create_hb_banner(oschar* argv[])
 		utf8_to_utf16(hdr.titles[i].long_desc,  argv[3], 0x80);
 		utf8_to_utf16(hdr.titles[i].publisher,  argv[4], 0x40);
 #else
-		if (utf8_argv) {
-			utf8_to_utf16(hdr.titles[i].short_desc, utf8_argv[2], 0x40);
-			utf8_to_utf16(hdr.titles[i].long_desc,  utf8_argv[3], 0x80);
-			utf8_to_utf16(hdr.titles[i].publisher,  utf8_argv[4], 0x40);
-		} else {
-			wcsncpy((oschar*)hdr.titles[i].short_desc, argv[2], 0x40);
-			wcsncpy((oschar*)hdr.titles[i].long_desc,  argv[3], 0x80);
-			wcsncpy((oschar*)hdr.titles[i].publisher,  argv[4], 0x40);
-		}
+		wcsncpy((oschar*)hdr.titles[i].short_desc, argv[2], 0x40);
+		wcsncpy((oschar*)hdr.titles[i].long_desc,  argv[3], 0x80);
+		wcsncpy((oschar*)hdr.titles[i].publisher,  argv[4], 0x40);
 #endif
 	}
 
@@ -483,11 +470,6 @@ int osmain(int argc, oschar* argv[])
 			return 1;
 		}
 
-#ifdef WIN32
-		fix_mingw_path(argv[5]);
-		if (argc==8) fix_mingw_path(argv[7]);
-#endif
-
 		return create_hb_banner(argv);
 	}
 	else usage(argv);
@@ -503,20 +485,6 @@ extern "C" void __wgetmainargs(int*,wchar_t***,wchar_t***,int,int*);
 int main(int xargc, char** xargv) {
 	wchar_t **enpv, **argv;
 	int argc, si = 0;
-
-	// Argument passing is broken in old versions of msys such as the one distributed by devkitPro.
-	// UTF-8 strings are incorrectly expanded to 16-bit and passed as-is, without properly converting
-	// code units. For this reason we need to detect these old versions of msys and do the UTF-8 to
-	// UTF-16 conversion ourselves.
-	FILE* f = popen("uname", "r");
-	if (f) {
-		char buf[256];
-		fgets(buf, sizeof(buf), f);
-		fclose(f);
-		if (strncmp(buf, "MINGW32", 7)==0) {
-			utf8_argv = xargv;
-		}
-	}
 
 	__wgetmainargs(&argc, &argv, &enpv, _CRT_glob, &si); // this also creates the global variable __wargv
 	return wmain(argc, argv);
