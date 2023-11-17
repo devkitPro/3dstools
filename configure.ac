@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT([3dstools],[1.3.0],[https://github.com/devkitPro/3dstools/issues])
+AC_INIT([3dstools],[1.3.1],[https://github.com/devkitPro/3dstools/issues])
 AC_CONFIG_SRCDIR([src/3dsxtool.cpp])
 
 AM_INIT_AUTOMAKE([subdir-objects])
